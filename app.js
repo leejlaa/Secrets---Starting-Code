@@ -4,7 +4,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose =require("mongoose");
-const md5 = require("md5");
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 mongoose.connect("mongodb://127.0.0.1:27017/userDB", { useNewUrlParser:true });
@@ -27,7 +28,7 @@ const User = new mongoose.model("User",userSchema);
 
 const admin = new User({
     email: "admin@gmail.com",
-    password: md5(123456)
+    password: 123456
 })
 
 app.get("/", function(req,res){
@@ -44,24 +45,28 @@ app.get("/register", function(req,res){
 });
 
 app.post("/register", function(req,res){
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+    
+        newUser.save().then(() => { // here will the password be encrypted.
+    
+            console.log('User added to DB.');
+        
+            res.render('login');
+        
+          })
+        
+          .catch(err => {
+        
+            res.status(400).send("Unable to save post to database.");
+        
+          });
     });
-
-    newUser.save().then(() => { // here will the password be encrypted.
-
-        console.log('User added to DB.');
     
-        res.render('login');
-    
-      })
-    
-      .catch(err => {
-    
-        res.status(400).send("Unable to save post to database.");
-    
-      });
 
 });
 
@@ -86,10 +91,13 @@ const getUsers = async () => {
         }
         console.log(users);
        users.forEach(user => {
-            if(user.email == req.body.username && user.password == md5(req.body.password)){
-                console.log("User found with a correct password, proceed ahead..");
-                res.render("secrets.ejs");
-            } 
+        bcrypt.compare(req.body.password, user.password, function(err, result) {
+            if(result)
+            console.log("User found with a correct password, proceed ahead..");
+            res.render("secrets.ejs");
+        });
+                
+            
        });
     })
     .catch(error => console.error(error));
